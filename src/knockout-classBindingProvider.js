@@ -49,27 +49,51 @@
             var i, j, bindingAccessor, binding,
                 result = {},
                 value, index,
-                classes = "";
+                classes = "",
+                classContext,
+                virtualDataAttributes, getAttribute;
 
             if (node.nodeType === 1) {
                 classes = node.getAttribute(this.attribute);
+
+                getAttribute = function(name) {
+                    return node.getAttribute(name);
+                };
             }
             else if (node.nodeType === 8) {
                 value = "" + node.nodeValue || node.text;
                 index = value.indexOf(virtualAttribute);
 
                 if (index > -1) {
-                    classes = value.substring(index + virtualAttribute.length);
+                    virtualDataAttributes = value.substring(index + virtualAttribute.length).split(',');
+                    classes = virtualDataAttributes[0];
+                    virtualDataAttributes = virtualDataAttributes.slice(1);
                 }
+
+                getAttribute = function(name) {
+                    var foundAttr;
+                    name = name + ":";
+                    foundAttr = ko.utils.arrayFirst(virtualDataAttributes, function(attr) {
+                        return attr.indexOf(name) > -1;
+                    });
+                    return foundAttr && foundAttr.split(':')[1].replace(/^(\s|\u00A0)+|(\s|\u00A0)+$/g, "");
+                };
+
             }
 
             if (classes) {
                 classes = classes.replace(/^(\s|\u00A0)+|(\s|\u00A0)+$/g, "").replace(/(\s|\u00A0){2,}/g, " ").split(' ');
+                classContext = {
+                    node: node,
+                    classes: classes,
+                    getAttribute: getAttribute
+                };
+
                 //evaluate each class, build a single object to return
                 for (i = 0, j = classes.length; i < j; i++) {
                     bindingAccessor = this.bindings[classes[i]];
                     if (bindingAccessor) {
-                        binding = typeof bindingAccessor == "function" ? bindingAccessor.call(bindingContext.$data, bindingContext) : bindingAccessor;
+                        binding = typeof bindingAccessor == "function" ? bindingAccessor.call(bindingContext.$data, bindingContext, classContext) : bindingAccessor;
                         ko.utils.extend(result, binding);
                     }
                 }
